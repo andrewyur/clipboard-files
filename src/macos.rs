@@ -5,15 +5,14 @@ use objc_id::{Id, Owned};
 use std::mem::transmute;
 use std::path::PathBuf;
 
-use crate::Error;
-use crate::FileOperation;
+use crate::{ClipboardError, FileOperation};
 
-pub(crate) fn read_clipboard() -> Result<Vec<PathBuf>, Error> {
+pub(crate) fn read_clipboard() -> Result<Vec<PathBuf>, ClipboardError> {
     let clipboard = Clipboard::new()?;
     clipboard.read()
 }
 
-pub(crate) fn write_clipboard(paths: Vec<PathBuf>, _operation: FileOperation) -> Result<(), Error> {
+pub(crate) fn write_clipboard(paths: Vec<PathBuf>, _operation: FileOperation) -> Result<(), ClipboardError> {
     let clipboard = Clipboard::new()?;
     clipboard.write(paths)
 }
@@ -30,11 +29,11 @@ extern "C" {
 }
 
 impl Clipboard {
-    pub fn new() -> Result<Clipboard, Error> {
+    pub fn new() -> Result<Clipboard, ClipboardError> {
         let ns_pasteboard = class!(NSPasteboard);
         let pasteboard: *mut Object = unsafe { msg_send![ns_pasteboard, generalPasteboard] };
         if pasteboard.is_null() {
-            return Err(Error::SystemError(
+            return Err(ClipboardError::SystemError(
                 "NSPasteboard#generalPasteboard returned null".into(),
             ));
         }
@@ -42,7 +41,7 @@ impl Clipboard {
         Ok(Clipboard { pasteboard })
     }
 
-    pub fn read(&self) -> Result<Vec<PathBuf>, Error> {
+    pub fn read(&self) -> Result<Vec<PathBuf>, ClipboardError> {
         let ns_dict = class!(NSDictionary);
         let ns_number = class!(NSNumber);
         let options: Id<NSDictionary<NSObject, NSObject>> = unsafe {
@@ -63,7 +62,7 @@ impl Clipboard {
             let obj: *mut NSArray<NSObject> =
                 msg_send![self.pasteboard, readObjectsForClasses:&*classes options:&*options];
             if obj.is_null() {
-                return Err(Error::NoFiles);
+                return Err(ClipboardError::NoFiles);
             }
             Id::from_ptr(obj)
         };
@@ -84,13 +83,13 @@ impl Clipboard {
             })
             .collect();
         if results.is_empty() {
-            Err(Error::NoFiles)
+            Err(ClipboardError::NoFiles)
         } else {
             Ok(results)
         }
     }
 
-    pub fn write(&self, paths: Vec<PathBuf>) -> Result<(), Error> {
+    pub fn write(&self, paths: Vec<PathBuf>) -> Result<(), ClipboardError> {
         unsafe{ msg_send![ self.pasteboard, clearContents ]}
 
         let nsurl_class = class!(NSURL);
@@ -110,7 +109,7 @@ impl Clipboard {
         if success {
             Ok(())
         } else {
-            Err(Error::SystemError("Failed to write file URLs to pasteboard".into()))
+            Err(ClipboardError::SystemError("Failed to write file URLs to pasteboard".into()))
         }
     }
     

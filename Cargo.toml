@@ -16,9 +16,19 @@ gtk = "0.18"
 urlencoding = "2.1.0"
 
 [target.'cfg(target_os = "windows")'.dependencies]
-clipboard-win = "4.4.1"
+windows = { version = "0.61.3", features = [
+  "Win32_Foundation",
+  "Win32_UI_WindowsAndMessaging",
+  "Win32_System_DataExchange",
+  "Win32_System_Memory",
+  "Win32_System_Ole",
+  "Win32_UI_Shell"
+] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc = "0.2.7"
 objc-foundation = "0.1.1"
 objc_id = "0.1.1"
+
+[dependencies]
+thiserror = "2.0.12"
