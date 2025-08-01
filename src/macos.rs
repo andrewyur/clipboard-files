@@ -3,12 +3,19 @@ use objc_foundation::{INSArray, INSString};
 use objc_foundation::{NSArray, NSDictionary, NSObject, NSString};
 use objc_id::{Id, Owned};
 use std::mem::transmute;
+use std::path::PathBuf;
 
 use crate::Error;
+use crate::FileOperation;
 
-pub(crate) fn read_clipboard() -> Result<Vec<String>, Error> {
+pub(crate) fn read_clipboard() -> Result<Vec<PathBuf>, Error> {
     let clipboard = Clipboard::new()?;
     clipboard.read()
+}
+
+pub(crate) fn write_clipboard(paths: Vec<PathBuf>, _operation: FileOperation) -> Result<(), Error> {
+    let clipboard = Clipboard::new()?;
+    clipboard.write(paths)
 }
 
 pub struct Clipboard {
@@ -35,7 +42,7 @@ impl Clipboard {
         Ok(Clipboard { pasteboard })
     }
 
-    pub fn read(&self) -> Result<Vec<String>, Error> {
+    pub fn read(&self) -> Result<Vec<PathBuf>, Error> {
         let ns_dict = class!(NSDictionary);
         let ns_number = class!(NSNumber);
         let options: Id<NSDictionary<NSObject, NSObject>> = unsafe {
@@ -73,7 +80,7 @@ impl Clipboard {
                     let ret = msg_send![obj, path];
                     ret
                 };
-                Some(s.as_str().to_owned())
+                Some(PathBuf::from(s.as_str()))
             })
             .collect();
         if results.is_empty() {
@@ -82,6 +89,31 @@ impl Clipboard {
             Ok(results)
         }
     }
+
+    pub fn write(&self, paths: Vec<PathBuf>) -> Result<(), Error> {
+        unsafe{ msg_send![ self.pasteboard, clearContents ]}
+
+        let nsurl_class = class!(NSURL);
+        
+        let nsurl_array = {
+            let nsurl_vec = paths.iter().map(|path| {
+                let ns_str = NSString::from_str(path.to_str().unwrap());
+                let ns_url: Id<NSObject, Owned> = unsafe { Id::from_ptr(msg_send![nsurl_class, fileURLWithPath:ns_str ]) };
+                ns_url
+            }).collect();
+            NSArray::from_vec(nsurl_vec)
+        };
+
+
+        let success: bool = unsafe { msg_send![ self.pasteboard, writeObjects: nsurl_array] }; 
+
+        if success {
+            Ok(())
+        } else {
+            Err(Error::SystemError("Failed to write file URLs to pasteboard".into()))
+        }
+    }
+    
 }
 
 // this is a convenience function that both cocoa-rs and
