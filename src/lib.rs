@@ -1,10 +1,5 @@
-#[macro_use]
-#[cfg(target_os = "macos")]
-extern crate objc;
-
 #[cfg(target_os = "linux")]
 mod linux;
-use std::path::PathBuf;
 
 #[cfg(target_os = "linux")]
 use linux::read_clipboard;
@@ -20,6 +15,7 @@ mod windows;
 use windows::{read_clipboard, write_clipboard};
 
 use thiserror::Error;
+use std::path::PathBuf;
 
 /// Read the system-wide clipboard. Returns a list of one or more absolute file paths or an error.
 pub fn read() -> Result<Vec<PathBuf>, ClipboardError> {

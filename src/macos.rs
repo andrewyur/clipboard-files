@@ -1,124 +1,60 @@
-use objc::runtime::{Class, Object};
-use objc_foundation::{INSArray, INSString};
-use objc_foundation::{NSArray, NSDictionary, NSObject, NSString};
-use objc_id::{Id, Owned};
-use std::mem::transmute;
+use crate::{ClipboardError, FileOperation};
+use objc2::{runtime::ProtocolObject, ClassType};
+use objc2_app_kit::{NSPasteboard, NSPasteboardURLReadingFileURLsOnlyKey};
+use objc2_foundation::{NSArray, NSDictionary, NSNumber, NSURL};
 use std::path::PathBuf;
 
-use crate::{ClipboardError, FileOperation};
-
 pub(crate) fn read_clipboard() -> Result<Vec<PathBuf>, ClipboardError> {
-    let clipboard = Clipboard::new()?;
-    clipboard.read()
+    let pasteboard = unsafe { NSPasteboard::generalPasteboard() };
+
+    let val = NSNumber::numberWithBool(true);
+    let options = NSDictionary::from_slices(
+        &[unsafe { NSPasteboardURLReadingFileURLsOnlyKey }],
+        &[val.as_ref()],
+    );
+
+    let class_arr = NSArray::from_slice(&[NSURL::class()]);
+
+    let nsarray_result =
+        unsafe { pasteboard.readObjectsForClasses_options(&class_arr, Some(options.as_ref())) };
+
+    Ok(nsarray_result
+        .ok_or(ClipboardError::NoFiles)?
+        .iter()
+        .filter_map(|s| {
+            if let Ok(url_string) = s.downcast::<NSURL>() {
+                unsafe {
+                    url_string
+                        .absoluteString()
+                        .map(|f| PathBuf::from(f.to_string()))
+                }
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<PathBuf>>())
 }
 
-pub(crate) fn write_clipboard(paths: Vec<PathBuf>, _operation: FileOperation) -> Result<(), ClipboardError> {
-    let clipboard = Clipboard::new()?;
-    clipboard.write(paths)
-}
+pub(crate) fn write_clipboard(
+    paths: Vec<PathBuf>,
+    _operation: FileOperation,
+) -> Result<(), ClipboardError> {
+    let nsurl_array = NSArray::from_retained_slice(
+        &paths
+            .iter()
+            .filter_map(|p| NSURL::from_file_path(p.as_path()).map(ProtocolObject::from_retained))
+            .collect::<Vec<_>>(),
+    );
 
-pub struct Clipboard {
-    pasteboard: Id<Object>,
-}
-
-// required to bring NSPasteboard into the path of the class-resolver
-#[link(name = "AppKit", kind = "framework")]
-extern "C" {
-    // NSString
-    static NSPasteboardURLReadingFileURLsOnlyKey: &'static Object;
-}
-
-impl Clipboard {
-    pub fn new() -> Result<Clipboard, ClipboardError> {
-        let ns_pasteboard = class!(NSPasteboard);
-        let pasteboard: *mut Object = unsafe { msg_send![ns_pasteboard, generalPasteboard] };
-        if pasteboard.is_null() {
+    unsafe {
+        let pasteboard = NSPasteboard::generalPasteboard();
+        pasteboard.clearContents();
+        if !pasteboard.writeObjects(&*nsurl_array) {
             return Err(ClipboardError::SystemError(
-                "NSPasteboard#generalPasteboard returned null".into(),
+                "Could not write to system clipboard!".into(),
             ));
         }
-        let pasteboard: Id<Object> = unsafe { Id::from_ptr(pasteboard) };
-        Ok(Clipboard { pasteboard })
     }
 
-    pub fn read(&self) -> Result<Vec<PathBuf>, ClipboardError> {
-        let ns_dict = class!(NSDictionary);
-        let ns_number = class!(NSNumber);
-        let options: Id<NSDictionary<NSObject, NSObject>> = unsafe {
-            let obj: Id<NSObject> =
-                Id::from_ptr(msg_send![ns_number, numberWithBool: objc::runtime::YES]);
-            Id::from_ptr(
-                msg_send![ns_dict, dictionaryWithObject: &*obj forKey: NSPasteboardURLReadingFileURLsOnlyKey],
-            )
-        };
-
-        let nsurl_class: Id<NSObject> = {
-            let cls: Id<Class> = unsafe { Id::from_ptr(class("NSURL")) };
-            unsafe { transmute(cls) }
-        };
-
-        let classes: Id<NSArray<NSObject, Owned>> = NSArray::from_vec(vec![nsurl_class]);
-        let nsurl_array: Id<NSArray<NSObject>> = unsafe {
-            let obj: *mut NSArray<NSObject> =
-                msg_send![self.pasteboard, readObjectsForClasses:&*classes options:&*options];
-            if obj.is_null() {
-                return Err(ClipboardError::NoFiles);
-            }
-            Id::from_ptr(obj)
-        };
-
-        let results: Vec<_> = nsurl_array
-            .to_vec()
-            .into_iter()
-            .filter_map(|obj| {
-                let s: &NSString = unsafe {
-                    let is_file: bool = msg_send![obj, isFileURL];
-                    if !is_file {
-                        return None;
-                    }
-                    let ret = msg_send![obj, path];
-                    ret
-                };
-                Some(PathBuf::from(s.as_str()))
-            })
-            .collect();
-        if results.is_empty() {
-            Err(ClipboardError::NoFiles)
-        } else {
-            Ok(results)
-        }
-    }
-
-    pub fn write(&self, paths: Vec<PathBuf>) -> Result<(), ClipboardError> {
-        unsafe{ msg_send![ self.pasteboard, clearContents ]}
-
-        let nsurl_class = class!(NSURL);
-        
-        let nsurl_array = {
-            let nsurl_vec = paths.iter().map(|path| {
-                let ns_str = NSString::from_str(path.to_str().unwrap());
-                let ns_url: Id<NSObject, Owned> = unsafe { Id::from_ptr(msg_send![nsurl_class, fileURLWithPath:ns_str ]) };
-                ns_url
-            }).collect();
-            NSArray::from_vec(nsurl_vec)
-        };
-
-
-        let success: bool = unsafe { msg_send![ self.pasteboard, writeObjects: nsurl_array] }; 
-
-        if success {
-            Ok(())
-        } else {
-            Err(ClipboardError::SystemError("Failed to write file URLs to pasteboard".into()))
-        }
-    }
-    
-}
-
-// this is a convenience function that both cocoa-rs and
-// glutin define, which seems to depend on the fact that
-// Option::None has the same representation as a null pointer
-#[inline]
-fn class(name: &str) -> *mut Class {
-    unsafe { transmute(Class::get(name)) }
+    Ok(())
 }
