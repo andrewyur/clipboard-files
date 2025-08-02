@@ -17,16 +17,11 @@ use windows::Win32::System::DataExchange::{
 };
 use windows::core::{Error as WinError, BOOL};
 
-// pub(crate) fn write_clipboard(paths: Vec<PathBuf>, _operation: FileOperation) -> Result<(), ClipboardError> {
-//     clipboard.write(paths)
-// }
-
-
 
 
 impl From<WinError> for ClipboardError {
     fn from(e: WinError) -> Self {
-        ClipboardError::SystemError(format!("System returned an error when accessing clipboard: {e}"))
+        ClipboardError::SystemError(format!("System returned an error: {e}"))
     }
 }
 
@@ -72,7 +67,7 @@ pub(crate) fn read_clipboard() -> Result<Vec<PathBuf>, ClipboardError> {
     return Ok(paths);
 }
 
-pub(crate) fn write_clipboard(paths: Vec<PathBuf>, _operation: FileOperation) -> Result<(), ClipboardError>{
+pub(crate) fn write_clipboard(paths: Vec<PathBuf>) -> Result<(), ClipboardError>{
     let mut path_buf = String::new();
 
     paths.iter().for_each(| path| {

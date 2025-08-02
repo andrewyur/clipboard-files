@@ -1,4 +1,4 @@
-use clipboard_files::{read, write, FileOperation};
+use clipboard_files::{read, write};
 use std::path::PathBuf;
 
 fn main() {
@@ -6,6 +6,7 @@ fn main() {
     let absolute_path = std::fs::canonicalize(relative_path.clone()).unwrap();
 
     println!("{:?}", relative_path);
-    println!("{:?}", write(vec![relative_path, absolute_path], FileOperation::Copy));
-    println!("{:?}", read())
+    println!("{:?}", read()); 
+    println!("{:?}", write(vec![relative_path, absolute_path]));
+    println!("{:?}", read());
 }

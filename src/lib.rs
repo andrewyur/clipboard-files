@@ -2,7 +2,7 @@
 mod linux;
 
 #[cfg(target_os = "linux")]
-use linux::read_clipboard;
+use linux::{read_clipboard, write_clipboard};
 
 #[cfg(target_os = "macos")]
 mod macos;
@@ -14,26 +14,32 @@ mod windows;
 #[cfg(target_os = "windows")]
 use windows::{read_clipboard, write_clipboard};
 
-use thiserror::Error;
+use std::fs::canonicalize;
 use std::path::PathBuf;
+use thiserror::Error;
 
-/// Read the system-wide clipboard. Returns a list of one or more absolute file paths or an error.
+/// Read the system-wide clipboard. Returns a list of one or more absolute file paths, guaranteed to exist, or an error. if the clipboard contains file paths that do not exist, they are filtered out from the response.
 pub fn read() -> Result<Vec<PathBuf>, ClipboardError> {
-    read_clipboard()
+    let paths = read_clipboard()?;
+
+    Ok(paths.into_iter()
+        .filter_map(|f| canonicalize(f).ok())
+        .collect::<Vec<PathBuf>>())
 }
 
-/// Write file paths to the system clipboard. file paths may be relative, but an error will be returned if they do not exist. Operation parameter is only used on linux systems.
-pub fn write(paths: Vec<PathBuf>, operation: FileOperation) -> Result<(), ClipboardError> {
-    let absolute_paths = paths.into_iter().map(|path_buf| {
-        std::fs::canonicalize(path_buf)
-    }).collect::<Result<Vec<PathBuf>, _> >();
+/// Write file paths to the system clipboard. file paths may be relative, but an error will be returned if they do not exist.
+pub fn write(paths: Vec<PathBuf>) -> Result<(), ClipboardError> {
+    let absolute_paths = paths
+        .into_iter()
+        .map(|path_buf| canonicalize(path_buf))
+        .collect::<Result<Vec<PathBuf>, _>>();
 
     if absolute_paths.is_err() {
         Err(ClipboardError::NoExist)
     } else {
-        write_clipboard(absolute_paths.unwrap(), operation)
+        write_clipboard(absolute_paths.unwrap())
     }
-}  
+}
 
 #[derive(Debug, PartialEq, Error)]
 pub enum ClipboardError {
@@ -43,10 +49,4 @@ pub enum ClipboardError {
     NoExist,
     #[error("The system returned an error: {0}")]
     SystemError(String),
-}
-
-#[derive(Debug, PartialEq)]
-pub enum FileOperation {
-    Copy,
-    Move,
 }
