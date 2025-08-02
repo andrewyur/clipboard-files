@@ -23,8 +23,8 @@ pub fn read() -> Result<Vec<PathBuf>, ClipboardError> {
     let paths = read_clipboard()?;
 
     Ok(paths.into_iter()
-        .filter_map(|f| canonicalize(f).ok())
-        .collect::<Vec<PathBuf>>())
+        .filter_map(|f| canonicalize(f).map(strip_prefix).ok())
+        .collect::<Vec<_>>())
 }
 
 /// Write file paths to the system clipboard. file paths may be relative, but an error will be returned if they do not exist.
@@ -37,7 +37,19 @@ pub fn write(paths: Vec<PathBuf>) -> Result<(), ClipboardError> {
     if absolute_paths.is_err() {
         Err(ClipboardError::NoExist)
     } else {
-        write_clipboard(absolute_paths.unwrap())
+        write_clipboard(absolute_paths
+            .unwrap()
+            .into_iter()
+            .map(|p| strip_prefix(p))
+            .collect::<Vec<_>>()
+        )
+    }
+}
+
+fn strip_prefix(p: PathBuf) -> PathBuf {
+    match p.to_str() {
+        None => p,
+        Some(s) => PathBuf::from(s.strip_prefix(r"\\?\").unwrap_or(s))
     }
 }
 

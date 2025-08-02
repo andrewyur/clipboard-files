@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 use std::ptr::copy_nonoverlapping;
-use crate::{ClipboardError, FileOperation};
+use crate::{ClipboardError};
 use windows::Win32::{
     Foundation::{HWND, HANDLE, GetLastError, ERROR_SUCCESS},
     System::Memory::{GlobalAlloc, GlobalLock, GlobalUnlock, GMEM_MOVEABLE}, 
@@ -71,7 +71,8 @@ pub(crate) fn write_clipboard(paths: Vec<PathBuf>) -> Result<(), ClipboardError>
     let mut path_buf = String::new();
 
     paths.iter().for_each(| path| {
-        let s = path.display().to_string();
+        let s = path.display().to_string(); 
+
         path_buf.push_str(&s);
         path_buf.push('\0');
     });
@@ -88,6 +89,7 @@ pub(crate) fn write_clipboard(paths: Vec<PathBuf>) -> Result<(), ClipboardError>
         fWide: BOOL(1),
     };
     
+
 
     let h_global;
     
