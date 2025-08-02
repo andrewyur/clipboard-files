@@ -1,25 +1,23 @@
 # Clipboard Files
 
-This crate lets you read file paths from the system wide clipboard, that are copied from
-Explorer, Finder, etc.
+This crate lets you read and write file paths to/from the system wide clipboard, that are copied from and can be used by Explorer, Finder, etc.
 
 It's supported on Windows, Linux (using GTK) and MacOS.
 
 ## Reading
 
-```
+```rust
 use clipboard_files;
+use std::path::PathBuf;
 
 fn main() {
+    let file_path = PathBuf::from(file!());
+    clipboard_files::write(vec![file_path]).unwrap();
+
     let files = clipboard_files::read();
     println!(files);
 }
 ```
-
-## Writing
-
-Not supported, mostly due to lack of support in the Linux and Windows upstream crates.
-Consider filing a PR in those.
 
 ## Why?
 
