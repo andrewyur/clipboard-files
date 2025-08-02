@@ -19,26 +19,29 @@ pub(crate) fn read_clipboard() -> Result<Vec<PathBuf>, ClipboardError> {
     let nsarray_result =
         unsafe { pasteboard.readObjectsForClasses_options(&class_arr, Some(options.as_ref())) };
 
-    Ok(nsarray_result
-        .ok_or(ClipboardError::NoFiles)?
-        .iter()
-        .filter_map(|s| {
-            if let Ok(url_string) = s.downcast::<NSURL>() {
-                unsafe {
-                    url_string
-                        .absoluteString()
-                        .map(|f| strip_prefix(PathBuf::from(f.to_string())))
+    let ns_array = nsarray_result.ok_or(ClipboardError::NoFiles)?;
+
+    if ns_array.count() == 0 {
+        Err(ClipboardError::NoFiles)
+    } else {
+        Ok(ns_array
+            .iter()
+            .filter_map(|s| {
+                if let Ok(url_string) = s.downcast::<NSURL>() {
+                    unsafe {
+                        url_string
+                            .absoluteString()
+                            .map(|f| strip_prefix(PathBuf::from(f.to_string())))
+                    }
+                } else {
+                    None
                 }
-            } else {
-                None
-            }
-        })
-        .collect::<Vec<PathBuf>>())
+            })
+            .collect::<Vec<PathBuf>>())
+    }
 }
 
-pub(crate) fn write_clipboard(
-    paths: Vec<PathBuf>
-) -> Result<(), ClipboardError> {
+pub(crate) fn write_clipboard(paths: Vec<PathBuf>) -> Result<(), ClipboardError> {
     let nsurl_array = NSArray::from_retained_slice(
         &paths
             .iter()
@@ -62,8 +65,6 @@ pub(crate) fn write_clipboard(
 fn strip_prefix(p: PathBuf) -> PathBuf {
     match p.to_str() {
         None => p,
-        Some(s) => {
-            PathBuf::from_str(s.strip_prefix(r"file://").unwrap_or(s)).unwrap_or(p)
-        }
+        Some(s) => PathBuf::from_str(s.strip_prefix(r"file://").unwrap_or(s)).unwrap_or(p),
     }
 }
