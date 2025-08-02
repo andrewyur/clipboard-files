@@ -16,6 +16,7 @@ use windows::{read_clipboard, write_clipboard};
 
 use std::fs::canonicalize;
 use std::path::PathBuf;
+use std::str::FromStr;
 use thiserror::Error;
 
 /// Read the system-wide clipboard. Returns a list of one or more absolute file paths, guaranteed to exist, or an error. if the clipboard contains file paths that do not exist, they are filtered out from the response.
@@ -49,7 +50,9 @@ pub fn write(paths: Vec<PathBuf>) -> Result<(), ClipboardError> {
 fn strip_prefix(p: PathBuf) -> PathBuf {
     match p.to_str() {
         None => p,
-        Some(s) => PathBuf::from(s.strip_prefix(r"\\?\").unwrap_or(s))
+        Some(s) => {
+            PathBuf::from_str(s.strip_prefix(r"\\?\").unwrap_or(s)).unwrap_or(p)
+        }
     }
 }
 

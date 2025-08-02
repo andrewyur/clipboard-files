@@ -1,8 +1,9 @@
-use crate::{ClipboardError, FileOperation};
+use crate::ClipboardError;
 use objc2::{runtime::ProtocolObject, ClassType};
 use objc2_app_kit::{NSPasteboard, NSPasteboardURLReadingFileURLsOnlyKey};
 use objc2_foundation::{NSArray, NSDictionary, NSNumber, NSURL};
 use std::path::PathBuf;
+use std::str::FromStr;
 
 pub(crate) fn read_clipboard() -> Result<Vec<PathBuf>, ClipboardError> {
     let pasteboard = unsafe { NSPasteboard::generalPasteboard() };
@@ -26,7 +27,7 @@ pub(crate) fn read_clipboard() -> Result<Vec<PathBuf>, ClipboardError> {
                 unsafe {
                     url_string
                         .absoluteString()
-                        .map(|f| PathBuf::from(f.to_string()))
+                        .map(|f| strip_prefix(PathBuf::from(f.to_string())))
                 }
             } else {
                 None
@@ -56,4 +57,13 @@ pub(crate) fn write_clipboard(
     }
 
     Ok(())
+}
+
+fn strip_prefix(p: PathBuf) -> PathBuf {
+    match p.to_str() {
+        None => p,
+        Some(s) => {
+            PathBuf::from_str(s.strip_prefix(r"file://").unwrap_or(s)).unwrap_or(p)
+        }
+    }
 }
