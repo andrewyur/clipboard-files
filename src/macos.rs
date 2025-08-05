@@ -41,7 +41,7 @@ pub(crate) fn read_clipboard() -> Result<Vec<PathBuf>, ClipboardError> {
     }
 }
 
-pub(crate) fn write_clipboard(paths: Vec<PathBuf>) -> Result<(), ClipboardError> {
+pub(crate) fn write_clipboard(paths: &Vec<PathBuf>) -> Result<(), ClipboardError> {
     let nsurl_array = NSArray::from_retained_slice(
         &paths
             .iter()

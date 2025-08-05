@@ -23,7 +23,7 @@ pub fn read() -> Result<Vec<PathBuf>, ClipboardError> {
 }
 
 /// Write file paths straight to the system clipboard. These do not have to be valid file paths, but some systems may clear paths from the clipboard that are invalid.
-pub fn write(paths: Vec<PathBuf>) -> Result<(), ClipboardError> {
+pub fn write(paths: &Vec<PathBuf>) -> Result<(), ClipboardError> {
     write_clipboard(paths)
 }
 

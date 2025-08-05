@@ -24,7 +24,7 @@ pub(crate) fn read_clipboard() -> Result<Vec<PathBuf>, ClipboardError> {
         .collect())
 }
 
-pub(crate) fn write_clipboard(paths: Vec<PathBuf>) -> Result<(), ClipboardError> {
+pub(crate) fn write_clipboard(paths: &Vec<PathBuf>) -> Result<(), ClipboardError> {
     gtk::init()?;
     let uri_list = paths
         .iter()

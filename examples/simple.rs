@@ -3,9 +3,9 @@ use std::{fs::canonicalize, path::PathBuf};
 
 fn main() {
     let file_path = canonicalize(file!()).unwrap();
-
-    println!("{:?}", file_path);
+    let path_buf_vec = vec![PathBuf::from(file_path)];
+    
     println!("{:?}", read()); 
-    println!("{:?}", write(vec![PathBuf::from(file_path)]));
+    println!("{:?}", write(&path_buf_vec));
     println!("{:?}", read()); 
 }

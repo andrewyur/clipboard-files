@@ -67,7 +67,7 @@ pub(crate) fn read_clipboard() -> Result<Vec<PathBuf>, ClipboardError> {
     return Ok(paths);
 }
 
-pub(crate) fn write_clipboard(paths: Vec<PathBuf>) -> Result<(), ClipboardError>{
+pub(crate) fn write_clipboard(paths: &Vec<PathBuf>) -> Result<(), ClipboardError>{
     let mut path_buf = String::new();
 
     paths.iter().for_each(| path| {
